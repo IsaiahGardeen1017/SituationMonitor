@@ -51,4 +51,10 @@ export default defineConfig([
       ],
     },
   },
+  {
+    files: ['server/**/*.ts', 'scripts/**/*.ts', 'vite.config.ts'],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
 ])

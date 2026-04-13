@@ -85,7 +85,7 @@ export function LayoutRoot({
   return (
     <div
       className={[
-        'h-screen w-screen bg-slate-950 text-slate-100',
+        'h-screen w-screen bg-neutral-800 text-neutral-100',
         overflow === 'scroll' ? 'overflow-auto' : 'overflow-hidden',
         className,
       ]
@@ -170,7 +170,7 @@ function renderNode(node: ResolvedNode): ReactElement {
     return (
       <section
         className={[
-          'flex h-full w-full min-h-0 min-w-0 flex-col overflow-hidden border border-slate-800 bg-slate-900/90 shadow-[0_0_0_1px_rgba(15,23,42,0.3)]',
+          'flex h-full w-full min-h-0 min-w-0 flex-col overflow-hidden border-2 border-solid border-orange-500 bg-neutral-900',
           node.className,
         ]
           .filter(Boolean)
@@ -193,7 +193,7 @@ function renderNode(node: ResolvedNode): ReactElement {
   return (
     <div
       className={[
-        'flex h-full w-full min-h-0 min-w-0 gap-3 overflow-hidden',
+        'flex h-full w-full min-h-0 min-w-0 overflow-hidden',
         isHorizontal ? 'flex-row' : 'flex-col',
         node.className,
       ]
@@ -203,7 +203,12 @@ function renderNode(node: ResolvedNode): ReactElement {
       {node.children.map((child, index) => (
         <div
           key={`${child.type}-${index}`}
-          className="min-h-0 min-w-0 overflow-hidden"
+          className={[
+            'min-h-0 min-w-0 overflow-hidden',
+            index > 0 ? (isHorizontal ? '-ml-0.5' : '-mt-0.5') : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
           style={getChildStyle(child, node.direction)}
         >
           {renderNode(child)}
