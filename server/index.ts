@@ -1,15 +1,13 @@
 import express, { type Request, type Response } from 'express'
-
-type QuoteSource = 'yahoo'
-
-type QuoteRecord = {
-  ticker: string
-  price: number | null
-  change: number | null
-  changePercent: number | null
-  currency: string | null
-  marketState: string | null
-}
+import {
+  tickerGroups,
+  type QuoteRecord,
+  type QuoteSource,
+  type RpcFailure,
+  type RpcSuccess,
+  type TickerInput,
+  type TickerPayload,
+} from '../src/sharedRpc'
 
 type YahooQuote = {
   currency?: string
@@ -33,39 +31,36 @@ const quoteProviders: Record<QuoteSource, (symbols: string[]) => Promise<QuoteRe
   yahoo: fetchYahooQuotes,
 }
 
+app.use(express.json())
+
 app.get('/api/health', (_request: Request, response: Response) => {
   response.json({ ok: true })
 })
 
-app.get('/api/quotes', async (request: Request, response: Response) => {
-  const source = getQuoteSource(request.query.source)
-  const symbols = parseSymbols(request.query.symbols)
+app.post('/trpc/ticker.get', async (request: Request, response: Response) => {
+  const input = request.body as TickerInput | undefined
 
-  if (!source) {
-    response.status(400).json({
-      error: `Unsupported quote source: ${String(request.query.source)}`,
-    })
+  if (!input || !isTickerInput(input)) {
+    sendTrpcError(response, 'Invalid input. Expected { group: "ALL" | "STRATEGIC" }.', 400)
     return
   }
 
-  if (symbols.length === 0) {
-    response.status(400).json({
-      error: 'Query parameter "symbols" is required.',
-    })
-    return
-  }
+  const source = input.source ?? 'yahoo'
+  const symbols = tickerGroups[input.group]
 
   try {
     const quotes = await quoteProviders[source](symbols)
-    response.json({
-      quotes,
-      source,
-    })
+    const payload: TickerPayload = { quotes, source }
+    const success: RpcSuccess<TickerPayload> = {
+      result: {
+        data: payload,
+      },
+    }
+
+    response.json(success)
   } catch (error) {
-    console.error('Quote proxy failed', error)
-    response.status(502).json({
-      error: 'Failed to fetch quotes from upstream provider.',
-    })
+    console.error('Quote RPC failed', error)
+    sendTrpcError(response, 'Failed to fetch quotes from upstream provider.', 502)
   }
 })
 
@@ -73,27 +68,18 @@ app.listen(port, () => {
   console.log(`API server listening on http://localhost:${port}`)
 })
 
-function getQuoteSource(sourceQuery: unknown): QuoteSource | null {
-  if (sourceQuery === undefined) {
-    return 'yahoo'
+function sendTrpcError(response: Response, message: string, statusCode: number): void {
+  const failure: RpcFailure = {
+    error: {
+      message,
+    },
   }
 
-  if (sourceQuery === 'yahoo') {
-    return sourceQuery
-  }
-
-  return null
+  response.status(statusCode).json(failure)
 }
 
-function parseSymbols(symbolsQuery: unknown): string[] {
-  if (typeof symbolsQuery !== 'string') {
-    return []
-  }
-
-  return symbolsQuery
-    .split(',')
-    .map((symbol) => symbol.trim().toUpperCase())
-    .filter(Boolean)
+function isTickerInput(input: TickerInput): input is TickerInput {
+  return input.group in tickerGroups
 }
 
 async function fetchYahooQuotes(symbols: string[]): Promise<QuoteRecord[]> {
